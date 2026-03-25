@@ -8,8 +8,13 @@ class PID:
     """
     Discrete PID controller with simple anti-windup for saturated actuators.
 
+    Units (typical use in this project):
+      - target, current: same physical quantity (e.g. speed in m/s)
+      - dt: s
+      - output: dimensionless throttle command in [u_min, u_max], usually [0, 1]
+
     Assumption:
-    - output is directly clamped between u_min and u_max (like a throttle command).
+      - output is directly clamped between u_min and u_max (like a throttle command).
     """
 
     kp: float

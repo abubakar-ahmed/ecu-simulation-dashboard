@@ -98,10 +98,12 @@ Build the heart of the system.
 - Just console logs
 
 **Run Phase 1:**
-- Command:
+- Command (speed in **m/s**, mass in **kg**, force in **N**; see `--help`):
   `python simulation/main.py --target 30 --kp 0.5 --ki 0.1 --kd 0.05`
-- The script prints periodic `speed/throttle/error` lines and a summary:
-  overshoot, settling time, and steady-state error.
+- Optional: sensor noise on the speed feedback (stresses the PID): `--noise-sigma 0.15` (m/s), plus `--seed 42` for repeatable runs.
+- Optional: save telemetry to CSV: `--output-csv simulation/telemetry.csv` (columns: time_s, speed_true_m_s, speed_measured_m_s, target_m_s, throttle, error_control).
+- Optional: save a speed plot (needs `pip install -r requirements.txt`): `--plot simulation/phase1_speed.png`
+- The script prints periodic lines and a summary: overshoot, settling time, steady-state error (true vs measured when noise is on).
 
 PHASE 2 — Add Realism (Noise + Disturbance)
 
