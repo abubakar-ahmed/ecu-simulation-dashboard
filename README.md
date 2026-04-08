@@ -133,23 +133,23 @@ python simulation/main.py --noise-sigma 0.15 --c-rr 0.015 --throttle-rate-limit 
 **Output:**
 - Evaluate whether the PID recovers after disturbances, whether it oscillates, and how tuning (`Kp`, `Ki`, `Kd`) interacts with limits and noise.
 
-PHASE 3 — Backend API (Django or FastAPI)
+PHASE 3 — Backend API (FastAPI, implemented in `backend/main.py`)
 
 🎯 Goal:
-Expose simulation data.
+Expose live simulation data and retune control from outside the process.
 
-Build API endpoints:
-1. Get telemetry
+What is implemented:
+1. Telemetry endpoint
    - `GET /telemetry/`
-   - Returns:
+   - Returns live values:
      ```json
      {
        "speed": 118.5,
-       "target_speed": 120,
+       "target_speed": 120.0,
        "throttle": 0.72
      }
      ```
-2. Update parameters
+2. Control endpoint
    - `PUT /control/`
    - Body:
      ```json
@@ -162,46 +162,77 @@ Build API endpoints:
      ```
 
 Architecture:
-- Simulation runs in a background thread/process
-- API reads shared state
+- Simulation loop runs continuously in a background thread (`dt=0.1s`)
+- API handlers read/write shared state guarded by a lock
+- PID gains and target are applied immediately via `/control/`
 
-**Output:**
-You can control the ECU from outside.
+Run Phase 3:
+```bash
+pip install -r requirements.txt
+uvicorn backend.main:app --reload
+```
 
-PHASE 4 — Dashboard UI
+Quick API checks:
+```bash
+curl http://127.0.0.1:8000/telemetry/
+curl -X PUT http://127.0.0.1:8000/control/ -H "Content-Type: application/json" -d "{\"target_speed\":130,\"kp\":0.5,\"ki\":0.1,\"kd\":0.05}"
+```
+
+PHASE 4 — Dashboard UI (React + Recharts, implemented in `frontend/`)
 
 🎯 Goal:
-Visualize and control the system.
+Visualize telemetry and tune control live from the browser.
 
-Build:
-1. Live graph
-   - Speed vs time
-   - Target vs actual
-2. Gauge
-   - Throttle %
+What is implemented:
+1. Live graph (Recharts)
+   - Actual speed vs time
+   - Target speed vs time
+2. Throttle gauge
+   - Circular percentage gauge (`0-100%`)
 3. Controls
-   - Slider -> target speed
-   - Sliders -> `Kp`, `Ki`, `Kd`
+   - Slider: `target_speed`
+   - Sliders: `kp`, `ki`, `kd`
+   - Changes are pushed to `PUT /control/` with a short debounce for smooth tuning
 
-Tools:
-- Flutter (recommended)
-- React (optional)
+Backend integration:
+- Polls `GET /telemetry/` every 250 ms
+- Reads initial values from `GET /control/`
+- CORS enabled in backend to allow frontend dev server access
 
-**Output:**
-- Real-time interaction
-- "Pit wall" feel
+Run Phase 4:
+```bash
+# Terminal 1
+uvicorn backend.main:app --reload
+
+# Terminal 2
+cd frontend
+npm install
+npm run dev
+```
 
 PHASE 5 — Real-Time Communication
 
 🎯 Goal:
 Make it feel like a real telemetry system.
 
-Upgrade:
-- Use WebSockets (Django Channels or FastAPI websockets) instead of polling
-- Stream data continuously
+Upgrade (implemented):
+- FastAPI WebSocket endpoint: `ws://127.0.0.1:8000/ws/telemetry`
+- Backend pushes telemetry continuously at simulation cadence (`dt=0.1s`)
+- Frontend dashboard consumes the stream directly (no polling loop for telemetry)
+- Frontend auto-reconnects if the socket drops and shows connection status (`WS LIVE`, `CONNECTING`, `RECONNECTING`)
+
+Run Phase 5:
+```bash
+# Terminal 1
+uvicorn backend.main:app --reload
+
+# Terminal 2
+cd frontend
+npm run dev
+```
 
 **Output:**
-Smooth real-time updates.
+Smooth real-time updates with lower request overhead than HTTP polling.
 
 PHASE 6 — Data Logging & Analysis
 

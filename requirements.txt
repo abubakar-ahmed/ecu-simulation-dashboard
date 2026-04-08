@@ -1,2 +1,4 @@
 # Simulation tooling (CSV + optional plots)
 matplotlib>=3.5.0
+fastapi
+uvicorn
