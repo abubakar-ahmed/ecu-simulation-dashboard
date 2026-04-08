@@ -101,35 +101,37 @@ Build the heart of the system.
 - Command (speed in **m/s**, mass in **kg**, force in **N**; see `--help`):
   `python simulation/main.py --target 30 --kp 0.5 --ki 0.1 --kd 0.05`
 - Optional: sensor noise on the speed feedback (stresses the PID): `--noise-sigma 0.15` (m/s), plus `--seed 42` for repeatable runs.
-- Optional: save telemetry to CSV: `--output-csv simulation/telemetry.csv` (columns: time_s, speed_true_m_s, speed_measured_m_s, target_m_s, throttle, error_control).
-- Optional: save a speed plot (needs `pip install -r requirements.txt`): `--plot simulation/phase1_speed.png`
+- Optional: save telemetry to CSV: `--output-csv simulation/telemetry.csv` (includes Phase 2 fields when used: `throttle_commanded`, `throttle_applied`, `drag_multiplier`, `disturbance_active`, `f_disturbance_n`, etc.; see `--help`).
+- Optional: save plots (needs `pip install -r requirements.txt`): `--plot simulation/phase1_speed.png` (two panels: speed vs time, control error vs time; red vertical lines mark disturbance window when set).
 - The script prints periodic lines and a summary: overshoot, settling time, steady-state error (true vs measured when noise is on).
 
-PHASE 2 — Add Realism (Noise + Disturbance)
+PHASE 2 — Realism and robustness (implemented in `simulation/`)
 
 🎯 Goal:
-Make the system behave like real hardware.
+Make the system behave more like real hardware: noisy sensors, limited actuators, disturbances, rolling resistance.
 
-Add sensor noise:
-```
-v_measured = v_true + noise
-```
+What is implemented:
+- **Sensor noise** (already in Phase 1 path): `--noise-sigma` (m/s), `--seed`.
+- **Rolling resistance**: `--c-rr` (dimensionless), with `F_rr = c_rr * m * g` (N), opposing motion when `v > 0`.
+- **Disturbance window**: optional `[--disturb-start, --disturb-end)` in seconds; while active, aerodynamic drag is multiplied by `--disturb-drag-mult`, and an extra longitudinal force `--disturb-force-n` (N) can model braking or push.
+- **Actuator**: `--throttle-rate-limit` (max change per second), `--throttle-delay-steps` (output lags the rate-limited command).
+- **Scenarios** (presets; override any flag by passing it explicitly): `--scenario normal | noisy | disturbance | full`.
+- **Telemetry**: extended CSV columns for analysis and later ML; plots include **error vs time** and disturbance markers.
 
-Example (signal noise):
-```python
-import random
-noise = random.uniform(-0.5, 0.5)
-measured_speed = true_speed + noise
-```
+Example experiments:
+```bash
+# Scenario 1: clean run (Phase-1-like)
+python simulation/main.py --target 30 --kp 0.5 --ki 0.1 --kd 0.05 --noise-sigma 0
 
-Add disturbances:
-- Sudden drag increase
-- Slope simulation
-- Random braking force
+# Scenario 2: gust / extra drag between 10 s and 15 s
+python simulation/main.py --disturb-start 10 --disturb-end 15 --disturb-drag-mult 2 --plot simulation/phase2_disturb.png
+
+# Scenario 3: noisy sensor + rolling + rate-limited throttle
+python simulation/main.py --noise-sigma 0.15 --c-rr 0.015 --throttle-rate-limit 0.2 --seed 42 --output-csv simulation/telemetry.csv --plot simulation/phase2.png
+```
 
 **Output:**
-- PID must handle instability
-- Tune `Kp`, `Ki`, `Kd` manually
+- Evaluate whether the PID recovers after disturbances, whether it oscillates, and how tuning (`Kp`, `Ki`, `Kd`) interacts with limits and noise.
 
 PHASE 3 — Backend API (Django or FastAPI)
 
