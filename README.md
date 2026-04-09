@@ -178,6 +178,14 @@ curl http://127.0.0.1:8000/telemetry/
 curl -X PUT http://127.0.0.1:8000/control/ -H "Content-Type: application/json" -d "{\"target_speed\":130,\"kp\":0.5,\"ki\":0.1,\"kd\":0.05}"
 ```
 
+Start a **new test run** (zero speed, reset PID/actuator state, clear analysis log, restart simulation clock `sim_time_s`):
+
+```bash
+curl -X POST http://127.0.0.1:8000/simulation/reset
+```
+
+Telemetry JSON includes `sim_time_s` (seconds since last reset) for charting and CSV export still uses wall-clock `timestamp_s` in the analysis log.
+
 PHASE 4 — Dashboard UI (React + Recharts, implemented in `frontend/`)
 
 🎯 Goal:
@@ -231,42 +239,50 @@ cd frontend
 npm run dev
 ```
 
+If the terminal shows `No supported WebSocket library detected` or `GET /ws/telemetry ... 404`, the server process is missing WebSocket support. Install extras in the **same** environment you use to run Uvicorn, then restart (stop the process and start again):
+
+```bash
+pip install "uvicorn[standard]"
+```
+
 **Output:**
 Smooth real-time updates with lower request overhead than HTTP polling.
 
-PHASE 6 — Data Logging & Analysis
+PHASE 6 — Data Logging & Analysis (implemented)
 
 🎯 Goal:
-Analyze system performance.
+Analyze system performance from the live simulation.
 
-Store:
-- `speed`
-- `throttle`
-- `error`
-- `timestamp`
+Store (ring buffer, max ~20 minutes at `dt=0.1s`):
+- `speed` (m/s), `throttle` (0–1), `error` = `target - speed` (m/s), `timestamp` = seconds **since log start** (or call `POST /analysis/log/reset` to start a new axis)
 
-Compute:
-1. Overshoot
-2. Settling time
-3. Steady-state error
+Compute (see `backend/analysis.py`; metrics use **last target** in the buffer as setpoint reference):
+1. Overshoot — max peak above that target
+2. Settling time — first time speed stays within tolerance until end of buffer
+3. Steady-state error — |mean(last 20% of speeds) − target|
 
 **Output:**
-- Graphs after each run
-- Performance summary
+- `GET /analysis/summary` — JSON performance summary
+- `GET /analysis/export.csv` — logged columns: `timestamp_s`, `speed_m_s`, `target_m_s`, `throttle`, `error_m_s`
+- `GET /analysis/plot.png` — matplotlib PNG (speed + target, throttle)
+- `POST /analysis/log/reset` — clear buffer for a fresh run
+- Dashboard panel **Phase 6 — Logging & analysis** — reset log, refresh summary, download CSV, embedded plot
 
 PHASE 7 — Machine Learning Layer (Final Stage)
 
 🎯 Goal:
 Add intelligence (not direct control).
 
-Ideas:
-1. PID tuning model
-   - Input: system behavior
-   - Output: optimal `Kp`, `Ki`, `Kd`
-2. Drag prediction model
-   - Learn drag curve over time
-3. Energy optimization (EV)
-   - Minimize throttle usage
+**PID tuning assistant (classification — in progress):**  
+Recommend **which tuning action** to try next (e.g. reduce/increase `Kp` or `Ki`), not a full optimal triple. **Phase A (design)** is documented in:
+
+- `docs/tuning_classifier_phase_a.md` — class labels, rule order, default thresholds, feature list.
+
+Next steps: Phase B (generate labeled CSV from simulation sweeps), Phase C (train sklearn classifier), then API + UI.
+
+Other ideas (optional):
+2. Drag prediction — learn drag curve over time  
+3. Energy optimization (EV) — minimize throttle usage
 
 **Output:**
 ML enhances the control system.

@@ -15,6 +15,7 @@ type Telemetry = {
   target_speed: number;
   throttle: number;
   timestamp?: number;
+  sim_time_s?: number;
 };
 
 type Control = {
@@ -28,6 +29,17 @@ type Point = {
   t: number;
   speed: number;
   target: number;
+};
+
+type AnalysisSummary = {
+  sample_count: number;
+  duration_s: number;
+  target_ref_m_s: number | null;
+  overshoot_m_s: number | null;
+  settling_time_s: number | null;
+  steady_state_error_m_s: number | null;
+  tolerance_m_s?: number | null;
+  mean_abs_error_m_s?: number | null;
 };
 
 const API_BASE = "http://127.0.0.1:8000";
@@ -53,6 +65,14 @@ async function pushControl(control: Control): Promise<void> {
   }
 }
 
+async function resetSimulationRun(): Promise<Telemetry> {
+  const res = await fetch(`${API_BASE}/simulation/reset`, { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Reset run failed (${res.status})`);
+  }
+  return (await res.json()) as Telemetry;
+}
+
 function throttleColor(percent: number): string {
   if (percent < 35) return "#10b981";
   if (percent < 70) return "#f59e0b";
@@ -75,6 +95,8 @@ export default function App() {
   const [errorText, setErrorText] = useState<string>("");
   const [socketStatus, setSocketStatus] = useState<"connecting" | "live" | "reconnecting">("connecting");
   const elapsedRef = useRef(0);
+  const [analysisSummary, setAnalysisSummary] = useState<AnalysisSummary | null>(null);
+  const [plotNonce, setPlotNonce] = useState(0);
 
   useEffect(() => {
     let canceled = false;
@@ -111,7 +133,10 @@ export default function App() {
         if (!active) return;
         try {
           const t = JSON.parse(event.data) as Telemetry;
-          const tSec = Math.max(0, ((t.timestamp ?? Date.now() / 1000) * 1000 - startTsMs) / 1000);
+          const tSec =
+            typeof t.sim_time_s === "number"
+              ? t.sim_time_s
+              : Math.max(0, ((t.timestamp ?? Date.now() / 1000) * 1000 - startTsMs) / 1000);
           setTelemetry(t);
           setSeries((old) => {
             const point: Point = {
@@ -166,6 +191,30 @@ export default function App() {
     [telemetry.throttle],
   );
 
+  async function resetAnalysisLog() {
+    const res = await fetch(`${API_BASE}/analysis/log/reset`, { method: "POST" });
+    if (!res.ok) throw new Error(`Reset log failed (${res.status})`);
+    setAnalysisSummary(null);
+    setPlotNonce((n) => n + 1);
+  }
+
+  async function refreshAnalysisSummary() {
+    const res = await fetch(`${API_BASE}/analysis/summary`);
+    if (!res.ok) throw new Error(`Summary failed (${res.status})`);
+    const data = (await res.json()) as AnalysisSummary;
+    setAnalysisSummary(data);
+  }
+
+  async function newTestRun() {
+    const t = await resetSimulationRun();
+    setTelemetry(t);
+    setSeries([]);
+    elapsedRef.current = 0;
+    setAnalysisSummary(null);
+    setPlotNonce((n) => n + 1);
+    setErrorText("");
+  }
+
   return (
     <main className="dashboard">
       <header>
@@ -175,6 +224,16 @@ export default function App() {
           {" · "}
           <b>{socketStatus === "live" ? "WS LIVE" : socketStatus.toUpperCase()}</b>
         </p>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn-new-test"
+            title="Zero speed, reset PID/actuator, clear analysis log, restart chart time"
+            onClick={() => newTestRun().catch((e) => setErrorText(String(e)))}
+          >
+            New test (reset run)
+          </button>
+        </div>
       </header>
 
       {errorText ? <div className="error-banner">{errorText}</div> : null}
@@ -297,6 +356,89 @@ export default function App() {
               }
             />
           </label>
+        </article>
+
+        <article className="panel analysis-panel">
+          <h2>Phase 6 — Logging &amp; analysis</h2>
+          <p className="analysis-hint">
+            Backend logs speed, throttle, control error, and time (s since log start). Reset before a test, run the
+            sim, then refresh summary or export.
+          </p>
+          <div className="analysis-actions">
+            <button type="button" onClick={() => resetAnalysisLog().catch((e) => setErrorText(String(e)))}>
+              Reset log
+            </button>
+            <button type="button" onClick={() => refreshAnalysisSummary().catch((e) => setErrorText(String(e)))}>
+              Refresh summary
+            </button>
+            <a className="analysis-link" href={`${API_BASE}/analysis/export.csv`} target="_blank" rel="noreferrer">
+              Download CSV
+            </a>
+            <button type="button" onClick={() => setPlotNonce((n) => n + 1)}>
+              Refresh plot
+            </button>
+          </div>
+          {analysisSummary ? (
+            <dl className="analysis-metrics">
+              <div>
+                <dt>Samples</dt>
+                <dd>{analysisSummary.sample_count}</dd>
+              </div>
+              <div>
+                <dt>Duration</dt>
+                <dd>{analysisSummary.duration_s.toFixed(2)} s</dd>
+              </div>
+              <div>
+                <dt>Target ref</dt>
+                <dd>
+                  {analysisSummary.target_ref_m_s != null ? `${analysisSummary.target_ref_m_s.toFixed(2)} m/s` : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>Overshoot</dt>
+                <dd>
+                  {analysisSummary.overshoot_m_s != null ? `${analysisSummary.overshoot_m_s.toFixed(3)} m/s` : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>Settling time</dt>
+                <dd>
+                  {analysisSummary.settling_time_s != null
+                    ? `${analysisSummary.settling_time_s.toFixed(2)} s`
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>Steady-state |error|</dt>
+                <dd>
+                  {analysisSummary.steady_state_error_m_s != null
+                    ? `${analysisSummary.steady_state_error_m_s.toFixed(3)} m/s`
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>Mean |error|</dt>
+                <dd>
+                  {analysisSummary.mean_abs_error_m_s != null
+                    ? `${analysisSummary.mean_abs_error_m_s.toFixed(3)} m/s`
+                    : "—"}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="analysis-placeholder">No summary yet — click &quot;Refresh summary&quot;.</p>
+          )}
+          <div className="analysis-plot-wrap">
+            {analysisSummary && analysisSummary.sample_count >= 2 ? (
+              <img
+                className="analysis-plot"
+                src={`${API_BASE}/analysis/plot.png?nonce=${plotNonce}`}
+                alt="Speed, target, and throttle from logged run"
+              />
+            ) : (
+              <p className="analysis-placeholder">Plot appears after at least two logged samples (refresh plot).</p>
+            )}
+          </div>
         </article>
       </section>
     </main>
