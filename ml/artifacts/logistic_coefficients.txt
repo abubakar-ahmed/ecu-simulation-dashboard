@@ -1,0 +1,98 @@
+Logistic regression coefficients (one-vs-rest layout for multinomial)
+classes_: ['increase_ki' 'increase_kp' 'no_change' 'reduce_ki' 'reduce_kp']
+
+
+--- class increase_ki ---
+  kp                               -0.429412
+  ki                                1.032296
+  kd                                0.053549
+  target_speed_m_s                 -0.212456
+  dt_s                              0.000000
+  steps                             0.000000
+  noise_sigma                       0.000000
+  overshoot_m_s                    -0.118506
+  settling_time_s                  -1.930328
+  steady_state_error_m_s            0.499560
+  mean_abs_error_m_s               -0.373621
+  duration_s                       -0.000000
+  sample_count                      0.000000
+  tolerance_m_s                    -0.450672
+  target_ref_m_s                   -0.212456
+  overshoot_ratio                  -0.086530
+  ss_err_ratio                      0.503507
+
+--- class increase_kp ---
+  kp                                1.806095
+  ki                               -0.937861
+  kd                               -0.164793
+  target_speed_m_s                  0.587732
+  dt_s                              0.000000
+  steps                             0.000000
+  noise_sigma                       0.000000
+  overshoot_m_s                    -3.532836
+  settling_time_s                   1.816243
+  steady_state_error_m_s            0.489430
+  mean_abs_error_m_s                1.014177
+  duration_s                       -0.000000
+  sample_count                      0.000000
+  tolerance_m_s                     0.731565
+  target_ref_m_s                    0.587732
+  overshoot_ratio                  -2.429227
+  ss_err_ratio                      0.528698
+
+--- class no_change ---
+  kp                                2.782583
+  ki                               -0.776058
+  kd                               -0.442072
+  target_speed_m_s                  0.011890
+  dt_s                             -0.000000
+  steps                             0.000000
+  noise_sigma                       0.000000
+  overshoot_m_s                    -1.832976
+  settling_time_s                   0.448345
+  steady_state_error_m_s            0.543816
+  mean_abs_error_m_s               -1.809817
+  duration_s                        0.000000
+  sample_count                      0.000000
+  tolerance_m_s                    -0.598290
+  target_ref_m_s                    0.011890
+  overshoot_ratio                  -2.389005
+  ss_err_ratio                      0.560577
+
+--- class reduce_ki ---
+  kp                               -2.599227
+  ki                                0.522105
+  kd                                0.529608
+  target_speed_m_s                 -0.898563
+  dt_s                             -0.000000
+  steps                             0.000000
+  noise_sigma                       0.000000
+  overshoot_m_s                     0.663617
+  settling_time_s                  -0.894945
+  steady_state_error_m_s           -1.885342
+  mean_abs_error_m_s                0.689289
+  duration_s                        0.000000
+  sample_count                      0.000000
+  tolerance_m_s                     0.280244
+  target_ref_m_s                   -0.898563
+  overshoot_ratio                   0.529222
+  ss_err_ratio                     -2.019352
+
+--- class reduce_kp ---
+  kp                               -1.560039
+  ki                                0.159518
+  kd                                0.023707
+  target_speed_m_s                  0.511398
+  dt_s                              0.000000
+  steps                             0.000000
+  noise_sigma                       0.000000
+  overshoot_m_s                     4.820701
+  settling_time_s                   0.560685
+  steady_state_error_m_s            0.352535
+  mean_abs_error_m_s                0.479973
+  duration_s                       -0.000000
+  sample_count                      0.000000
+  tolerance_m_s                     0.037152
+  target_ref_m_s                    0.511398
+  overshoot_ratio                   4.375540
+  ss_err_ratio                      0.426570

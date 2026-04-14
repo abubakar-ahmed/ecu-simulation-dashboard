@@ -61,7 +61,7 @@ These are **starting points** when `target_ref` is on the order of **10–40 m/s
 | `DURATION_MIN_S` | `8.0` | Ignore “too short” runs for sluggish/offset rules. |
 | `OVERSHOOT_HIGH` | `max(1.5, 1.5 × tolerance_m_s)` | Strong overshoot → `reduce_kp`. |
 | `OVERSHOOT_LOW` | `max(0.3, 0.35 × tolerance_m_s)` | “Mild” overshoot band. |
-| `SETTLE_SLOW_S` | `18.0` | If settled slower than this → sluggish candidate. |
+| `SETTLE_SLOW_S` | `12.0` | If settled slower than this (or never) → sluggish candidate for `increase_kp`. (Was 18s; too many runs settled before that, so `increase_kp` stayed empty.) |
 | `SS_ERR_HIGH` | `max(0.6, 0.025 × |target_ref|)` | Clear offset → `increase_ki`. |
 | `SS_ERR_LOW` | `max(0.25, 0.01 × |target_ref|)` | Offset mostly removed. |
 
@@ -116,14 +116,25 @@ If nothing matches (rare), default to **`no_change`** or **`increase_kp`** depen
 
 ---
 
-## 6. What you do next (Phase B preview)
+## 6. Phase B (implemented)
 
-1. Implement these rules in a **pure function** `label_run(metrics, kp, ki, kd) -> str`.
-2. Sweep simulations → CSV: **features + `label`**.
-3. Check **class counts**; nudge thresholds if one class vanishes or dominates.
+1. **Rules:** `backend/tuning_labels.py` → `label_run(metrics, kp, ki, kd) -> str`.
+2. **Dataset script:** `ml/generate_tuning_dataset.py` — calls `simulation.main.run_simulation`, then `analyze_series`, then `label_run`; writes CSV under `ml/data/`.
+3. Run from repo root: `python ml/generate_tuning_dataset.py --output ml/data/tuning_runs.csv --n 2000 --seed 42`
+4. Check printed **class balance**; nudge thresholds or sampling ranges if a class vanishes or dominates.
 
 ---
 
-## 7. Interview one-liner
+## 7. Phase C (train & evaluate)
+
+Implemented in `ml/train_tuning_classifier.py`:
+
+- Load CSV → train/val split (80/20, stratified when possible).
+- Baselines: majority class, logistic regression (+ scaler), random forest.
+- Save `ml/artifacts/tuning_rf.joblib` (+ optional logistic), `metrics.json`, feature importances / logistic coefficients text files.
+
+**Notebook:** `ml/tuning_walkthrough.ipynb` — same pipeline with class balance plot, confusion matrix, and RF importances (run Jupyter from repo root).
+
+## 8. Interview one-liner
 
 > “We cast PID help as **multiclass classification**: the model recommends **which gain to nudge next**, trained on **rule-labeled** simulation runs, using the same **overshoot / settling / steady-state** metrics as our dashboard.”

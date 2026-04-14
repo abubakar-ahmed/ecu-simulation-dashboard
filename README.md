@@ -278,7 +278,34 @@ Recommend **which tuning action** to try next (e.g. reduce/increase `Kp` or `Ki`
 
 - `docs/tuning_classifier_phase_a.md` — class labels, rule order, default thresholds, feature list.
 
-Next steps: Phase B (generate labeled CSV from simulation sweeps), Phase C (train sklearn classifier), then API + UI.
+**Phase B (dataset generation):** from repo root:
+
+```bash
+python ml/generate_tuning_dataset.py --output ml/data/tuning_runs.csv --n 2000 --seed 42
+# Smaller grid (caps size): 
+# python ml/generate_tuning_dataset.py --mode grid --max-runs 1500 --output ml/data/tuning_runs.csv --seed 42
+```
+
+- Labels: `backend/tuning_labels.py` (`label_run`) matches `docs/tuning_classifier_phase_a.md`.
+- Features/metrics: `backend/analysis.py` (`analyze_series`), same as Phase 6.
+- Script prints **class balance**; if one class is empty or tiny, widen sampling ranges (`--kp-min` / `--target-max`) or nudge thresholds in `backend/tuning_labels.py` / the doc. Example: **`increase_kp` at 0%** usually means almost every run **settles before** the “slow” threshold (`SETTLE_SLOW_S`, default **12s**); raising it toward your horizon (e.g. 18s) shrinks `increase_kp` again.
+
+**Phase C (train & evaluate):** from repo root (requires `ml/data/tuning_runs.csv`):
+
+```bash
+pip install -r requirements.txt
+python ml/train_tuning_classifier.py --data ml/data/tuning_runs.csv --out-dir ml/artifacts
+```
+
+**Notebook:** interactive step-through (same training + plots) — open `ml/tuning_walkthrough.ipynb` in Jupyter/VS Code; run from repo root so `ROOT` resolves. Optional: `%pip install pandas matplotlib` in the first code cell if needed.
+
+- **80/20 split**, stratified by label when possible.
+- **Baselines:** majority class (`DummyClassifier`); **LogisticRegression** + `StandardScaler` (balanced class weights).
+- **Main model:** **RandomForestClassifier** (300 trees, balanced, `joblib` bundle with feature names).
+- **Outputs:** `ml/artifacts/tuning_rf.joblib`, `tuning_logistic.joblib`, `metrics.json`, `feature_importances_rf.txt`, `logistic_coefficients.txt`.
+- **Sanity:** rule-replay check vs `label_run` (may be &lt; 1.0 if CSV rounding moves borderline cases).
+
+Next steps: wire `POST /tuning/suggest` + UI button (load `tuning_rf.joblib`).
 
 Other ideas (optional):
 2. Drag prediction — learn drag curve over time  

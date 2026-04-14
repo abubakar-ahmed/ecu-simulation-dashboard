@@ -1,0 +1,119 @@
+{
+  "n_total": 2000,
+  "n_train": 1600,
+  "n_val": 400,
+  "test_size": 0.2,
+  "seed": 42,
+  "rule_replay_accuracy_full": 0.9925,
+  "baseline_majority_val_accuracy": 0.5375,
+  "logistic_val_accuracy": 0.9375,
+  "random_forest_val_accuracy": 0.995,
+  "labels": [
+    "increase_ki",
+    "increase_kp",
+    "no_change",
+    "reduce_ki",
+    "reduce_kp"
+  ],
+  "classification_report_val_rf": {
+    "increase_ki": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 3.0
+    },
+    "increase_kp": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 55.0
+    },
+    "no_change": {
+      "precision": 1.0,
+      "recall": 0.9953488372093023,
+      "f1-score": 0.9976689976689976,
+      "support": 215.0
+    },
+    "reduce_ki": {
+      "precision": 0.9879518072289156,
+      "recall": 1.0,
+      "f1-score": 0.9939393939393939,
+      "support": 82.0
+    },
+    "reduce_kp": {
+      "precision": 0.9782608695652174,
+      "recall": 1.0,
+      "f1-score": 0.989010989010989,
+      "support": 45.0
+    },
+    "accuracy": 0.995,
+    "macro avg": {
+      "precision": 0.9932425353588267,
+      "recall": 0.9324031007751937,
+      "f1-score": 0.9561238761238762,
+      "support": 400.0
+    },
+    "weighted avg": {
+      "precision": 0.9950844683080146,
+      "recall": 0.995,
+      "f1-score": 0.9947683982683984,
+      "support": 400.0
+    }
+  },
+  "confusion_matrix_val_rf": [
+    [
+      2,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      0,
+      55,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      214,
+      1,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      82,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      45
+    ]
+  ],
+  "feature_names": [
+    "kp",
+    "ki",
+    "kd",
+    "target_speed_m_s",
+    "dt_s",
+    "steps",
+    "noise_sigma",
+    "overshoot_m_s",
+    "settling_time_s",
+    "steady_state_error_m_s",
+    "mean_abs_error_m_s",
+    "duration_s",
+    "sample_count",
+    "tolerance_m_s",
+    "target_ref_m_s",
+    "overshoot_ratio",
+    "ss_err_ratio"
+  ]
+}

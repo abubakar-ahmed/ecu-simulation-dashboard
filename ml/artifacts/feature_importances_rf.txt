@@ -1,0 +1,19 @@
+Random Forest feature importances (val model, full train fit)
+
+overshoot_m_s                 0.249046
+overshoot_ratio               0.153693
+settling_time_s               0.119472
+steady_state_error_m_s        0.092140
+ss_err_ratio                  0.087956
+kp                            0.086622
+mean_abs_error_m_s            0.056707
+target_speed_m_s              0.053247
+target_ref_m_s                0.052805
+tolerance_m_s                 0.036147
+ki                            0.009285
+kd                            0.002879
+noise_sigma                   0.000000
+steps                         0.000000
+duration_s                    0.000000
+dt_s                          0.000000
+sample_count                  0.000000
