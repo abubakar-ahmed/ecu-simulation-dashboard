@@ -42,9 +42,25 @@ type AnalysisSummary = {
   mean_abs_error_m_s?: number | null;
 };
 
+type TuningSuggestResult = {
+  action: string;
+  probabilities: Record<string, number>;
+  rationale: string;
+};
+
 const API_BASE = "http://127.0.0.1:8000";
 const WS_BASE = "ws://127.0.0.1:8000/ws/telemetry";
 const MAX_POINTS = 120;
+const KP_MIN = 0;
+const KP_MAX = 2;
+const KI_MIN = 0;
+const KI_MAX = 1;
+const KD_MIN = 0;
+const KD_MAX = 1;
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
 
 async function fetchControl(): Promise<Control> {
   const res = await fetch(`${API_BASE}/control/`);
@@ -97,6 +113,9 @@ export default function App() {
   const elapsedRef = useRef(0);
   const [analysisSummary, setAnalysisSummary] = useState<AnalysisSummary | null>(null);
   const [plotNonce, setPlotNonce] = useState(0);
+  const [tuningSuggest, setTuningSuggest] = useState<TuningSuggestResult | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [applyingNudge, setApplyingNudge] = useState(false);
 
   useEffect(() => {
     let canceled = false;
@@ -214,6 +233,62 @@ export default function App() {
     setPlotNonce((n) => n + 1);
     setErrorText("");
   }
+
+  async function suggestTuningAction() {
+    setSuggesting(true);
+    try {
+      const res = await fetch(`${API_BASE}/tuning/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        let detail = `Suggest failed (${res.status})`;
+        try {
+          const body = (await res.json()) as { detail?: string };
+          if (body.detail) detail = body.detail;
+        } catch {
+          // Keep generic message when non-JSON errors are returned.
+        }
+        throw new Error(detail);
+      }
+      const data = (await res.json()) as TuningSuggestResult;
+      setTuningSuggest(data);
+      setErrorText("");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function applySuggestedNudge() {
+    if (!tuningSuggest) return;
+    const nudges: Record<string, Partial<Control>> = {
+      increase_kp: { kp: 0.05 },
+      reduce_kp: { kp: -0.05 },
+      increase_ki: { ki: 0.02 },
+      reduce_ki: { ki: -0.02 },
+      no_change: {},
+    };
+    const delta = nudges[tuningSuggest.action] ?? {};
+    if (!Object.keys(delta).length) return;
+    setApplyingNudge(true);
+    try {
+      setControl((prev) => ({
+        ...prev,
+        kp: clamp(prev.kp + (delta.kp ?? 0), KP_MIN, KP_MAX),
+        ki: clamp(prev.ki + (delta.ki ?? 0), KI_MIN, KI_MAX),
+        kd: clamp(prev.kd + (delta.kd ?? 0), KD_MIN, KD_MAX),
+      }));
+      setErrorText("");
+    } finally {
+      setApplyingNudge(false);
+    }
+  }
+
+  const sortedSuggestionProbabilities = useMemo(() => {
+    if (!tuningSuggest) return [];
+    return Object.entries(tuningSuggest.probabilities).sort((a, b) => b[1] - a[1]);
+  }, [tuningSuggest]);
 
   return (
     <main className="dashboard">
@@ -377,6 +452,52 @@ export default function App() {
             <button type="button" onClick={() => setPlotNonce((n) => n + 1)}>
               Refresh plot
             </button>
+          </div>
+          <div className="tuning-assist">
+            <h3>Phase 7 — Tuning assist</h3>
+            <div className="analysis-actions">
+              <button
+                type="button"
+                onClick={() => suggestTuningAction().catch((e) => setErrorText(String(e)))}
+                disabled={suggesting}
+              >
+                {suggesting ? "Suggesting..." : "Suggest tuning action"}
+              </button>
+              <button
+                type="button"
+                onClick={() => applySuggestedNudge().catch((e) => setErrorText(String(e)))}
+                disabled={!tuningSuggest || tuningSuggest.action === "no_change" || applyingNudge}
+                title="Apply a small automatic gain nudge, then existing control update flow sends PUT /control/"
+              >
+                {applyingNudge ? "Applying..." : "Apply nudge"}
+              </button>
+            </div>
+            {tuningSuggest ? (
+              <div className="tuning-suggest-card">
+                <p>
+                  Suggested action: <b>{tuningSuggest.action}</b>
+                </p>
+                {sortedSuggestionProbabilities.length > 0 ? (
+                  <ul className="tuning-probs">
+                    {sortedSuggestionProbabilities.map(([label, prob]) => (
+                      <li key={label}>
+                        <span>{label}</span>
+                        <b>{(prob * 100).toFixed(1)}%</b>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="analysis-placeholder">
+                    Probabilities unavailable (rule fallback may be active).
+                  </p>
+                )}
+                <p className="tuning-rationale">{tuningSuggest.rationale}</p>
+              </div>
+            ) : (
+              <p className="analysis-placeholder">
+                No suggestion yet — click &quot;Suggest tuning action&quot;.
+              </p>
+            )}
           </div>
           {analysisSummary ? (
             <dl className="analysis-metrics">

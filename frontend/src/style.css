@@ -166,6 +166,46 @@ header p {
   margin: 0 0 12px;
 }
 
+.tuning-assist {
+  margin: 8px 0 14px;
+  padding: 12px;
+  border: 1px solid #1f2a3e;
+  border-radius: 10px;
+  background: #0d1626;
+}
+
+.tuning-assist h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.tuning-suggest-card p {
+  margin: 8px 0;
+}
+
+.tuning-probs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.tuning-probs li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.92rem;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #131f33;
+}
+
+.tuning-rationale {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
 .analysis-plot-wrap {
   border: 1px solid #1f2a3e;
   border-radius: 10px;
