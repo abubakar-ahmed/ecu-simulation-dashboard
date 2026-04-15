@@ -7,12 +7,14 @@ import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .analysis import analyze_series, build_performance_plot, write_csv_text
+from .tuning_suggest import suggest as tuning_suggest
 from simulation.actuator import ThrottleActuator
 from simulation.pid import PID
 from simulation.vehicle import clamp, update_vehicle
@@ -76,6 +78,127 @@ class AnalysisSummaryResponse(BaseModel):
     steady_state_error_m_s: float | None
     tolerance_m_s: float | None = None
     mean_abs_error_m_s: float | None = None
+
+
+class TuningSuggestRequest(BaseModel):
+    """Use from_log=true (default) to consume the Phase 6 buffer; otherwise pass all gains + metrics."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    from_log: bool = True
+    kp: float | None = None
+    ki: float | None = None
+    kd: float | None = None
+    target_speed_m_s: float | None = None
+    dt_s: float | None = None
+    steps: int | None = None
+    noise_sigma: float | None = None
+    overshoot_m_s: float | None = None
+    settling_time_s: float | None = None
+    steady_state_error_m_s: float | None = None
+    mean_abs_error_m_s: float | None = None
+    duration_s: float | None = None
+    sample_count: int | None = None
+    tolerance_m_s: float | None = None
+    target_ref_m_s: float | None = None
+
+
+class TuningSuggestResponse(BaseModel):
+    action: str
+    probabilities: dict[str, float] = Field(default_factory=dict)
+    rationale: str
+
+
+_EXPLICIT_TUNING_FIELDS = (
+    "kp",
+    "ki",
+    "kd",
+    "target_speed_m_s",
+    "dt_s",
+    "steps",
+    "noise_sigma",
+    "overshoot_m_s",
+    "steady_state_error_m_s",
+    "mean_abs_error_m_s",
+    "duration_s",
+    "sample_count",
+    "tolerance_m_s",
+    "target_ref_m_s",
+)
+
+
+def _validate_explicit_tuning(req: TuningSuggestRequest) -> None:
+    missing = [name for name in _EXPLICIT_TUNING_FIELDS if getattr(req, name) is None]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Explicit mode (from_log=false) requires gains and metrics; "
+                f"missing: {', '.join(missing)}."
+            ),
+        )
+
+
+def _run_tuning_suggest(req: TuningSuggestRequest) -> TuningSuggestResponse:
+    if req.from_log:
+        samples = service.get_log_series()
+        if not samples:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Analysis log is empty; run the simulation to collect telemetry, "
+                    "or set from_log to false and pass explicit metrics."
+                ),
+            )
+        times_s = [s.timestamp for s in samples]
+        speeds = [s.speed_m_s for s in samples]
+        targets = [s.target_m_s for s in samples]
+        throttles = [s.throttle for s in samples]
+        metrics: dict[str, Any] = analyze_series(
+            times_s=times_s,
+            speeds_m_s=speeds,
+            targets_m_s=targets,
+            throttles=throttles,
+        )
+        c = service.get_control()
+        dt_s, noise = service.get_sim_dt_noise()
+        kp, ki, kd = c.kp, c.ki, c.kd
+        target_speed_m_s = c.target_speed
+        steps = int(metrics["sample_count"])
+    else:
+        _validate_explicit_tuning(req)
+        metrics = {
+            "sample_count": req.sample_count,
+            "duration_s": req.duration_s,
+            "target_ref_m_s": req.target_ref_m_s,
+            "overshoot_m_s": req.overshoot_m_s,
+            "settling_time_s": req.settling_time_s,
+            "steady_state_error_m_s": req.steady_state_error_m_s,
+            "tolerance_m_s": req.tolerance_m_s,
+            "mean_abs_error_m_s": req.mean_abs_error_m_s,
+        }
+        kp = req.kp
+        ki = req.ki
+        kd = req.kd
+        target_speed_m_s = req.target_speed_m_s
+        dt_s = req.dt_s
+        steps = req.steps
+        noise = req.noise_sigma
+
+    try:
+        out = tuning_suggest(
+            metrics=metrics,
+            kp=kp,
+            ki=ki,
+            kd=kd,
+            target_speed_m_s=target_speed_m_s,
+            dt_s=dt_s,
+            steps=steps,
+            noise_sigma=noise,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return TuningSuggestResponse(**out)
 
 
 class SimulationService:
@@ -201,6 +324,10 @@ class SimulationService:
     def get_log_series(self) -> list[LogSample]:
         with self._lock:
             return list(self._log)
+
+    def get_sim_dt_noise(self) -> tuple[float, float]:
+        with self._lock:
+            return (self._dt_s, self._noise_sigma_m_s)
 
     def _run_loop(self) -> None:
         next_tick = time.perf_counter()
@@ -425,6 +552,15 @@ def export_analysis_plot() -> Response:
         media_type="image/png",
         headers={"Content-Disposition": 'inline; filename="performance.png"'},
     )
+
+
+@app.post("/tuning/suggest", response_model=TuningSuggestResponse)
+@app.post("/tuning/classify", response_model=TuningSuggestResponse)
+def post_tuning_suggest(
+    payload: TuningSuggestRequest | None = Body(default=None),
+) -> TuningSuggestResponse:
+    req = payload if payload is not None else TuningSuggestRequest()
+    return _run_tuning_suggest(req)
 
 
 @app.websocket("/ws/telemetry")

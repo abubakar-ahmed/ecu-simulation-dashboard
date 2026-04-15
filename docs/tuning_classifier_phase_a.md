@@ -131,7 +131,7 @@ Implemented in `ml/train_tuning_classifier.py`:
 
 - Load CSV → train/val split (80/20, stratified when possible).
 - Baselines: majority class, logistic regression (+ scaler), random forest.
-- Save `ml/artifacts/tuning_rf.joblib` (+ optional logistic), `metrics.json`, feature importances / logistic coefficients text files.
+- Save `ml/artifacts/tuning_classifier.joblib`, `label_classes.json` (+ optional logistic), `metrics.json`, feature importances / logistic coefficients text files.
 
 **Notebook:** `ml/tuning_walkthrough.ipynb` — same pipeline with class balance plot, confusion matrix, and RF importances (run Jupyter from repo root).
 

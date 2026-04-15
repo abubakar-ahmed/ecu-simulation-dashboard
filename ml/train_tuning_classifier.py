@@ -205,15 +205,20 @@ def train_and_save(
         with metrics_path.open("w", encoding="utf-8") as f:
             json.dump(metrics, f, indent=2)
 
-        joblib.dump(
-            {
-                "kind": "random_forest",
-                "model": rf,
-                "feature_names": FEATURE_COLS,
-                "classes": labels_sorted,
-            },
-            out_dir / "tuning_rf.joblib",
-        )
+        rf_bundle = {
+            "kind": "random_forest",
+            "model": rf,
+            "feature_names": FEATURE_COLS,
+            "classes": labels_sorted,
+        }
+        joblib.dump(rf_bundle, out_dir / "tuning_classifier.joblib")
+        label_meta = {
+            "labels": labels_sorted,
+            "feature_names": FEATURE_COLS,
+            "model_kind": "random_forest",
+        }
+        with (out_dir / "label_classes.json").open("w", encoding="utf-8") as f:
+            json.dump(label_meta, f, indent=2)
         joblib.dump(
             {
                 "kind": "logistic_regression",
@@ -286,7 +291,7 @@ def main() -> None:
     print(f"  Logistic regression: {m['logistic_val_accuracy']:.4f}")
     print(f"  Random Forest:       {m['random_forest_val_accuracy']:.4f}")
     print(f"\nArtifacts: {args.out_dir}")
-    print("  - tuning_rf.joblib, tuning_logistic.joblib, metrics.json")
+    print("  - tuning_classifier.joblib, label_classes.json, tuning_logistic.joblib, metrics.json")
     print("  - feature_importances_rf.txt, logistic_coefficients.txt")
     print("\nConfusion matrix (rows=true, cols=pred), labels:", m["labels"])
     print(np.array(result["confusion_matrix"]))

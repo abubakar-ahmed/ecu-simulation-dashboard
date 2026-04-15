@@ -1,0 +1,29 @@
+{
+  "labels": [
+    "increase_ki",
+    "increase_kp",
+    "no_change",
+    "reduce_ki",
+    "reduce_kp"
+  ],
+  "feature_names": [
+    "kp",
+    "ki",
+    "kd",
+    "target_speed_m_s",
+    "dt_s",
+    "steps",
+    "noise_sigma",
+    "overshoot_m_s",
+    "settling_time_s",
+    "steady_state_error_m_s",
+    "mean_abs_error_m_s",
+    "duration_s",
+    "sample_count",
+    "tolerance_m_s",
+    "target_ref_m_s",
+    "overshoot_ratio",
+    "ss_err_ratio"
+  ],
+  "model_kind": "random_forest"
+}

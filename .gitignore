@@ -1,0 +1,26 @@
+# Python virtual environment (never commit)
+venv/
+.venv/
+env/
+
+# Bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment variables
+.env
+.env.local
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+
+# Frontend (if tools run from repo root)
+node_modules/
+frontend/node_modules/
+frontend/dist/

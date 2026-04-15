@@ -302,10 +302,14 @@ python ml/train_tuning_classifier.py --data ml/data/tuning_runs.csv --out-dir ml
 - **80/20 split**, stratified by label when possible.
 - **Baselines:** majority class (`DummyClassifier`); **LogisticRegression** + `StandardScaler` (balanced class weights).
 - **Main model:** **RandomForestClassifier** (300 trees, balanced, `joblib` bundle with feature names).
-- **Outputs:** `ml/artifacts/tuning_rf.joblib`, `tuning_logistic.joblib`, `metrics.json`, `feature_importances_rf.txt`, `logistic_coefficients.txt`.
+- **Outputs:** `ml/artifacts/tuning_classifier.joblib`, `label_classes.json`, `tuning_logistic.joblib`, `metrics.json`, `feature_importances_rf.txt`, `logistic_coefficients.txt`.
 - **Sanity:** rule-replay check vs `label_run` (may be &lt; 1.0 if CSV rounding moves borderline cases).
 
-Next steps: wire `POST /tuning/suggest` + UI button (load `tuning_rf.joblib`).
+**Phase D (ship with app):** commit `ml/artifacts/tuning_classifier.joblib` plus `label_classes.json` (labels + feature names for operators / UI); `scikit-learn` and `joblib` are listed in `requirements.txt`.
+
+**Phase E (API):** `POST /tuning/suggest` and `POST /tuning/classify` (same handler). Default body uses the Phase 6 log + current gains; set `"from_log": false` and pass gains + metrics to classify explicit features. Response: `action`, `probabilities`, `rationale`. If the artifact is missing or inference fails, the server falls back to Phase A rules (empty `probabilities`). Empty log with `from_log` true returns **503** with a clear message.
+
+Next steps: optional dashboard button calling `POST /tuning/suggest`.
 
 Other ideas (optional):
 2. Drag prediction — learn drag curve over time  
